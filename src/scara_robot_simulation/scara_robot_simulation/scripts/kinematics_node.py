@@ -12,11 +12,11 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 
 # Robot physical constants from the URDF
-L1 = 0.5
-L2 = 0.4
-L3 = 0.4
-BASE_HEIGHT = 1.0
-J3_Z_OFFSET = -0.5
+L1 = 0.3
+L2 = 0.2
+L3 = 0.25
+BASE_HEIGHT = 0.5
+J3_Z_OFFSET = -0.5 + 0.05
 J3_LIMIT_MIN = 0.0
 J3_LIMIT_MAX = 1.0
 ARM_PLANE_HEIGHT = BASE_HEIGHT + J3_Z_OFFSET

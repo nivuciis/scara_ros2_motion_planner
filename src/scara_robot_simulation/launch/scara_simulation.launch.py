@@ -7,21 +7,15 @@ from launch_ros.actions import Node
 import xacro
 
 def generate_launch_description():
-
-    # Get the package share directory
     scara_robot_pkg_share = get_package_share_directory('scara_robot_simulation')
 
-    # Path to the robot description (XACRO file)
     robot_description_path = os.path.join(
         scara_robot_pkg_share,
-        'description', 'urdf', 'scara_rrrp.ros2_control.xacro'
+        'description', 'urdf', 'scara_rrrp.urdf.xacro'
     )
-
-    # Process the XACRO file to get the URDF XML
     robot_description_config = xacro.process_file(robot_description_path)
     robot_description_xml = robot_description_config.toxml()
 
-    # --- Gazebo Launch ---
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')
@@ -29,7 +23,6 @@ def generate_launch_description():
         launch_arguments={'gz_args': '-r -v 4 empty.sdf'}.items(),
     )
 
-    # --- Robot State Publisher ---
     node_robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -37,15 +30,13 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_description_xml, 'use_sim_time': True}]
     )
 
-    # --- Spawn Robot in Gazebo ---
     spawn_entity = Node(
         package='ros_gz_sim',
         executable='create',
-        arguments=['-topic', 'robot_description', '-entity', 'scara_robot'],
+        arguments=['-topic', 'robot_description', '-entity', 'scara_rrrp'],
         output='screen'
     )
 
-    # --- Controller Spawners ---
     load_joint_state_broadcaster = Node(
         package='controller_manager',
         executable='spawner',
@@ -58,17 +49,14 @@ def generate_launch_description():
         arguments=['scara_arm_controller', '--controller-manager', '/controller_manager'],
     )
 
-    # --- NEW: Use a TimerAction to delay the controller spawners ---
-    # This gives Gazebo and all its plugins time to initialize completely.
     delayed_controller_spawners = TimerAction(
-        period=5.0,  # Delay in seconds
+        period=2.0,
         actions=[load_joint_state_broadcaster, load_arm_controller],
     )
 
-    # --- Launch Description ---
     return LaunchDescription([
         gazebo,
         node_robot_state_publisher,
         spawn_entity,
-        delayed_controller_spawners # Use the delayed action
+        delayed_controller_spawners
     ])
