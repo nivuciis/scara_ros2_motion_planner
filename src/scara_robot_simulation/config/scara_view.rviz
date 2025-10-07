@@ -1,0 +1,32 @@
+panels:
+  - class: rviz_common/Displays
+    help:
+      show_help: false
+      collapsed: false
+    name: Displays
+  - class: rviz_common/Views
+    name: Views
+  - class: rviz_common/Time
+    name: Time
+    sync_mode: 0
+    sync_source: ""
+visualization_frame: base_link
+displays:
+  - name: Grid
+    class: rviz_default_plugins/Grid
+    enabled: true
+  - name: RobotModel
+    class: rviz_default_plugins/RobotModel
+    enabled: true
+    description_topic:
+      depth: 5
+      durability: volatile
+      history: keep_last
+      reliability: reliable
+      topic: /robot_description
+  - name: TF
+    class: rviz_default_plugins/TF
+    enabled: true
+    show_names: true
+    show_arrows: true
+    scale: 0.5
