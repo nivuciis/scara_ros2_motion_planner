@@ -13,7 +13,7 @@ def generate_launch_description():
     # NOTE: We use the base URDF here, not the ros2_control one, as we are not simulating hardware
     robot_description_path = os.path.join(
         scara_robot_pkg_share,
-        'description', 'urdf', 'scara_rrrp.urdf.xacro'
+        'description', 'urdf', 'scara_rrrp.ros2_control.xacro'
     )
 
     # Process the XACRO file to get the URDF XML

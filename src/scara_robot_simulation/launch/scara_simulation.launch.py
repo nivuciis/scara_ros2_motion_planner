@@ -11,7 +11,7 @@ def generate_launch_description():
 
     robot_description_path = os.path.join(
         scara_robot_pkg_share,
-        'description', 'urdf', 'scara_rrrp.urdf.xacro'
+        'description', 'urdf', 'scara_rrrp.ros2_control.xacro'
     )
     robot_description_config = xacro.process_file(robot_description_path)
     robot_description_xml = robot_description_config.toxml()

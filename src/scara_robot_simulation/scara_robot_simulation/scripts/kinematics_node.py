@@ -4,7 +4,6 @@ from rclpy.action import ActionClient
 import numpy as np
 import math
 
-# Message/Action imports
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Pose
 from control_msgs.action import FollowJointTrajectory
@@ -14,12 +13,13 @@ from builtin_interfaces.msg import Duration
 # Robot physical constants from the URDF
 L1 = 0.3
 L2 = 0.2
-L3 = 0.25
+L3 = 0.45
+L12_WH = 0.05
 BASE_HEIGHT = 0.5
-J3_Z_OFFSET = -0.5 + 0.05
-J3_LIMIT_MIN = 0.0
-J3_LIMIT_MAX = 1.0
-ARM_PLANE_HEIGHT = BASE_HEIGHT + J3_Z_OFFSET
+J4_LIMIT_MIN = -L3 - L12_WH
+J4_LIMIT_MAX = BASE_HEIGHT + L12_WH
+ARM_PLANE_HEIGHT = BASE_HEIGHT - L3
+
 
 class KinematicsNode(Node):
     """A single node for both DK and IK for the Planar 3R+P robot."""
@@ -27,7 +27,6 @@ class KinematicsNode(Node):
     def __init__(self):
         super().__init__('kinematics_node')
 
-        # --- NEW: State tracking variable ---
         self.current_joint_positions = None
 
         self.dk_subscription = self.create_subscription(JointState, '/joint_states', self.joint_state_callback, 10)
@@ -42,18 +41,17 @@ class KinematicsNode(Node):
         self.get_logger().info('Calculating Robot Workspace Limits...')
         max_reach = L1 + L2 + L3
         self.get_logger().info(f'Max Horizontal Reach (R_max): {max_reach:.3f} meters')
-        z_min = ARM_PLANE_HEIGHT + J3_LIMIT_MIN
-        z_max = ARM_PLANE_HEIGHT + J3_LIMIT_MAX
+        z_min = ARM_PLANE_HEIGHT - J4_LIMIT_MAX
+        z_max = ARM_PLANE_HEIGHT - J4_LIMIT_MIN
         self.get_logger().info(f'Vertical Range (Z-axis): {z_min:.3f} m to {z_max:.3f} m')
         self.get_logger().info('-----------------------------------------')
 
     def euler_from_quaternion(self, quaternion):
         w, x, y, z = quaternion.w, quaternion.x, quaternion.y, quaternion.z
-        t3 = +2.0 * (w * z + x * y)
+        t3 = 2.0 * (w * z + x * y)
         t4 = +1.0 - 2.0 * (y * y + z * z)
         return math.atan2(t3, t4)
 
-    # --- UPDATED: This callback now handles both DK logging and state tracking ---
     def joint_state_callback(self, msg):
         try:
             q = [
@@ -68,89 +66,76 @@ class KinematicsNode(Node):
             # Log the DK calculation (throttled)
             pose = self.calculate_dk(q)
             self.get_logger().info(
-                f'DK Pose: x={pose[0]:.3f}, y={pose[1]:.3f}, z={pose[2]:.3f}, phi={pose[3]:.3f} rad',
+                f'DK Pose: x={pose[0]:.3f}, y={pose[1]:.3f}, z={pose[2]:.3f}, phi={pose[3]:.3f} rad (with joints: {[round(e, 2) for e in q]})',
                 throttle_duration_sec=1.0
             )
         except (ValueError, IndexError):
             self.get_logger().warn('Joints not fully available in /joint_states message yet.')
 
-    def calculate_dk(self, q):
-        theta1, theta2, d3, theta4 = q
+    @staticmethod
+    def calculate_dk(q):
+        theta1, theta2, theta3, d4 = q
         theta12 = theta1 + theta2
-        phi = theta12 + theta4
-        x = L1 * np.cos(theta1) + L2 * np.cos(theta12) + L3 * np.cos(phi)
-        y = L1 * np.sin(theta1) + L2 * np.sin(theta12) + L3 * np.sin(phi)
-        z = ARM_PLANE_HEIGHT + d3
+        phi = theta12 + theta3
+        x = L1 * np.cos(theta1) + L2 * np.cos(theta12)
+        y = L1 * np.sin(theta1) + L2 * np.sin(theta12)
+        z = ARM_PLANE_HEIGHT + d4
         return [x, y, z, phi]
 
-    # --- UPDATED: This function now returns BOTH IK solutions ---
     def calculate_ik(self, pose):
         x, y, z, phi = pose
-        d3 = z - ARM_PLANE_HEIGHT
+        dz = ARM_PLANE_HEIGHT - z
 
-        if not (J3_LIMIT_MIN <= d3 <= J3_LIMIT_MAX):
-            self.get_logger().error(f'Target Z position ({z:.3f}m) is UNREACHABLE.')
+        if not (J4_LIMIT_MIN < dz < J4_LIMIT_MAX):
+            self.get_logger().error(f'Target Z position ({z:.3f}m) is UNREACHABLE (joint4 would be {dz:.2f}).')
             return None, None
 
-        xw = x - L3 * np.cos(phi)
-        yw = y - L3 * np.sin(phi)
-        r_sq = xw**2 + yw**2
+        c2 = (x ** 2 + y ** 2 - L1 ** 2 - L2 ** 2) / (2 * L1 * L2)
 
-        if r_sq > (L1 + L2)**2 or r_sq < (L1 - L2)**2:
+        if c2 > 1 or c2 < -1:
             self.get_logger().error(f'Target XY wrist position is UNREACHABLE.')
             return None, None
 
-        cos_theta2 = (r_sq - L1**2 - L2**2) / (2 * L1 * L2)
-        cos_theta2 = np.clip(cos_theta2, -1.0, 1.0)
+        s2 = np.sqrt(1 - c2 ** 2)
+        atan2_yx = np.arctan2(y, x)
+        L2c2_L1 = L2 * c2 + L1
 
-        # Calculate both "elbow up" and "elbow down" solutions
-        sin_theta2_up = np.sqrt(1 - cos_theta2**2)
-        sin_theta2_down = -sin_theta2_up
+        theta1_p = atan2_yx - np.arctan2(L2 * s2, L2c2_L1)
+        theta2_p = np.arctan2(s2, c2)
+        theta3_p = phi - theta1_p - theta2_p
+        sol_up = (theta1_p, theta2_p, theta3_p, dz)
 
-        theta2_up = np.arctan2(sin_theta2_up, cos_theta2)
-        theta2_down = np.arctan2(sin_theta2_down, cos_theta2)
-
-        # --- Elbow Up Solution ---
-        k1_up = L1 + L2 * cos_theta2
-        k2_up = L2 * sin_theta2_up
-        theta1_up = np.arctan2(yw, xw) - np.arctan2(k2_up, k1_up)
-        theta4_up = phi - theta1_up - theta2_up
-        sol_up = [theta1_up, theta2_up, d3, theta4_up]
-
-        # --- Elbow Down Solution ---
-        k1_down = L1 + L2 * cos_theta2
-        k2_down = L2 * sin_theta2_down
-        theta1_down = np.arctan2(yw, xw) - np.arctan2(k2_down, k1_down)
-        theta4_down = phi - theta1_down - theta2_down
-        sol_down = [theta1_down, theta2_down, d3, theta4_down]
-
+        theta1_m = atan2_yx - np.arctan2(-L2 * s2, L2c2_L1)
+        theta2_m = np.arctan2(-s2, c2)
+        theta3_m = phi - theta1_m - theta2_m
+        sol_down = (theta1_m, theta2_m, theta3_m, dz)
         return sol_up, sol_down
 
-    # --- UPDATED: This callback now chooses the best solution ---
     def ik_target_pose_callback(self, msg):
         phi = self.euler_from_quaternion(msg.orientation)
-        self.get_logger().info(f'IK received target pose: [x={msg.position.x}, y={msg.position.y}, z={msg.position.z}, phi={phi:.2f}]')
+        self.get_logger().info(
+            f'IK received target pose: [x={msg.position.x}, y={msg.position.y}, z={msg.position.z}, phi={phi:.2f}]')
 
         target_pose = [msg.position.x, msg.position.y, msg.position.z, phi]
 
         sol_up, sol_down = self.calculate_ik(target_pose)
 
-        if sol_up is None: # If one is None, both are
-            return # Error message was already printed in calculate_ik
+        if sol_up is None:  # If one is None, both are
+            return  # Error message was already printed in calculate_ik
 
-        # --- Logic to choose the closest solution ---
         if self.current_joint_positions is None:
-            self.get_logger().warn('Current joint positions not yet known. Defaulting to elbow-up solution for first move.')
+            self.get_logger().warn(
+                'Current joint positions not yet known. Defaulting to elbow-up solution for first move.')
             best_solution = sol_up
         else:
-            q_current = np.array(self.current_joint_positions)
-            q_up = np.array(sol_up)
-            q_down = np.array(sol_down)
-
-            # Calculate distance in joint space (sum of absolute differences for revolute joints)
             # We ignore the prismatic joint as it's the same for both solutions
-            dist_up = np.sum(np.abs(q_current[[0, 1, 3]] - q_up[[0, 1, 3]]))
-            dist_down = np.sum(np.abs(q_current[[0, 1, 3]] - q_down[[0, 1, 3]]))
+            q_current = np.array(self.current_joint_positions[:-1])
+            q_up = np.array(sol_up[:-1])
+            q_down = np.array(sol_down[:-1])
+
+            # Calculate distance in joint space (sum of absolute differences for revolute joints) [Manhattan]
+            dist_up = np.sum(np.abs(q_current - q_up))
+            dist_down = np.sum(np.abs(q_current - q_down))
 
             if dist_up <= dist_down:
                 best_solution = sol_up
@@ -175,6 +160,7 @@ class KinematicsNode(Node):
         self.get_logger().info(f'Sending goal with joint positions: {np.round(joint_positions, 3)}')
         self._action_client.send_goal_async(goal_msg)
 
+
 def main(args=None):
     rclpy.init(args=args)
     node = KinematicsNode()
@@ -185,6 +171,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
