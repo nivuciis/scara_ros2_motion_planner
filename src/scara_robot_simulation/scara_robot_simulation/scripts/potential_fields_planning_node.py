@@ -98,7 +98,8 @@ class PotentialFieldsPlanner(Node):
             #calculate current end-effector pose
             full_pose = calculate_dk(q)
             self.current_pose_xy = full_pose[:2] 
-            
+        except ValueError as e:
+            self.get_logger().error(f'Error in joint_state_callback: {e}')
 
     def planner_loop(self):
         """main loop of the potential fields planner."""
