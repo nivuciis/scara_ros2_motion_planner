@@ -32,7 +32,11 @@ class KinematicsNode(Node):
         self.dk_subscription = self.create_subscription(JointState, '/joint_states', self.joint_state_callback, 10)
         self.ik_subscription = self.create_subscription(Pose, '/scara/target_pose', self.ik_target_pose_callback, 10)
         self._action_client = ActionClient(self, FollowJointTrajectory, '/scara_arm_controller/follow_joint_trajectory')
-
+        
+        self.get_logger().info('Waiting for action server...')
+        self._action_client.wait_for_server()
+        self.get_logger().info('Action server connected!')
+        
         self.get_logger().info('Smart Kinematics Node for Planar 3R+P Robot has started.')
         self.print_workspace_limits()
 
@@ -152,12 +156,14 @@ class KinematicsNode(Node):
         trajectory.joint_names = ['joint1', 'joint2', 'joint3', 'joint4']
         point = JointTrajectoryPoint()
         point.positions = [float(q) for q in joint_positions]
-        point.time_from_start = Duration(sec=3)
+
+        point.time_from_start = Duration(sec=0, nanosec=100000000)
+
         trajectory.points.append(point)
         goal_msg.trajectory = trajectory
-        self.get_logger().info('Waiting for action server...')
-        self._action_client.wait_for_server()
-        self.get_logger().info(f'Sending goal with joint positions: {np.round(joint_positions, 3)}')
+        #self.get_logger().info('Waiting for action server...')
+        #self._action_client.wait_for_server()
+        #self.get_logger().info(f'Sending goal with joint positions: {np.round(joint_positions, 3)}')
         self._action_client.send_goal_async(goal_msg)
 
 

@@ -16,13 +16,14 @@ setup(
         (os.path.join('share', package_name, 'scripts'), glob(os.path.join('scripts', '*.py'))),
         (os.path.join('share', package_name, 'description', 'urdf'), glob('description/urdf/*')),
         (os.path.join('share', package_name, 'config'), glob('config/*')),
+        (os.path.join('share', package_name, 'worlds'), glob(os.path.join('worlds', '*.world'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='paulo',
-    maintainer_email='prms@ic.ufal.br',
-    description='TODO: Package description',
-    license='TODO: License declaration',
+    maintainer='Vinicius RM Carvalho',
+    maintainer_email='vrmc@ic.ufal.br',
+    description='Implementation of motion planning algorithms (Potencial fiels and RRT) for an SCARA manipulator with ROS2/Gazebo.',
+    license='MIT',
     extras_require={
         'test': [
             'pytest',
@@ -31,6 +32,7 @@ setup(
     entry_points={
         'console_scripts': [
             'kinematics_node = scara_robot_simulation.scripts.kinematics_node:main',
+            'potential_fields_planning_node = scara_robot_simulation.scripts.potential_fields_planning_node:main',
         ],
     },
 )

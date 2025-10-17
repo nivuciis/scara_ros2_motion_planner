@@ -15,14 +15,19 @@ def generate_launch_description():
     )
     robot_description_config = xacro.process_file(robot_description_path)
     robot_description_xml = robot_description_config.toxml()
+    world_file_path = os.path.join(
+        scara_robot_pkg_share,
+        'worlds',
+        'obstacle_world.world'  
+    )
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
             os.path.join(get_package_share_directory('ros_gz_sim'), 'launch', 'gz_sim.launch.py')
         ]),
-        launch_arguments={'gz_args': '-r -v 4 empty.sdf'}.items(),
+        launch_arguments={'gz_args': f'-r -v 4 {world_file_path}'}.items(),
     )
-
+    
     node_robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
