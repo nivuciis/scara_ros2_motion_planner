@@ -32,8 +32,10 @@ setup(
     entry_points={
         'console_scripts': [
             'kinematics_node = scara_robot_simulation.scripts.kinematics_node:main',
-            'potential_fields_planning_node = scara_robot_simulation.scripts.potential_fields_planning_node:main',
-            'RRTstar_planning_node = scara_robot_simulation.scripts.RRTstar_planning_node:main'
+            'jacobian_kinematics_node = scara_robot_simulation.scripts.jacobian_kinematics_node:main',
+            'potential_field = scara_robot_simulation.scripts.potential_fields_planning_node:main',
+            'rrtstar = scara_robot_simulation.scripts.RRTstar_planning_node:main',
+            'potential_field_adaptative = scara_robot_simulation.scripts.adaptative_APF_node:main',
         ],
     },
 )

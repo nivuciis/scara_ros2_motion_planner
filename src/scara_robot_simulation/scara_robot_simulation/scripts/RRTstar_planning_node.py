@@ -51,8 +51,8 @@ class RRTStarPlanner(Node):
         ]
         
         # RRT* parameters
-        self.N_ITERATIONS = 1000      # number of iterations to build the tree
-        self.STEP_SIZE = 0.05         # size between nodes
+        self.N_ITERATIONS = 2000      # number of iterations to build the tree
+        self.STEP_SIZE = 0.08         # size between nodes
         self.NEAR_RADIUS = 0.15       # length to search for nearby nodes (RRT* specific)
         self.GOAL_THRESHOLD = 0.05    # distance to consider goal reached
         self.OBSTACLE_MARGIN = 0.02   # minimum distance from obstacles

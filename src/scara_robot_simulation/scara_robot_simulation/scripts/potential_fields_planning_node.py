@@ -40,8 +40,8 @@ class PotentialFieldsPlanner(Node):
 
         
         # Defines the GOAL position in the workspace
-        self.goal_pose = np.array([0.15, 0.225])  # x, y coordinates
-        self.goal_z = 0.1 # Fixed height for the end-effector (above the table)
+        self.goal_pose = np.array([0.05, 0.15])  # x, y coordinates
+        self.goal_z = 0.3 # Fixed height for the end-effector (above the table)
 
         #Obstacle map
         # taken from the .world file
@@ -58,7 +58,7 @@ class PotentialFieldsPlanner(Node):
         self.step_size = 0.02 # robot step size 
         self.goal_threshold = 0.02 #  to consider goal reached
 
-        self.get_logger().info('Potential Fields Planner Node has started.')
+        self.get_logger().info(f'Potential Fields Planner Node has started. goal is at: {self.goal_pose}')
         self.get_logger().info(f'==> Goal at: {self.goal_pose}')
         self.get_logger().info(f'==> Map obstacles: {len(self.obstacles)} ')
 
