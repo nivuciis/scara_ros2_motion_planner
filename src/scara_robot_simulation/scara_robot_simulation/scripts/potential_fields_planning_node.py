@@ -3,6 +3,8 @@ from rclpy.node import Node
 import numpy as np
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Pose
+import csv 
+import os 
 
 L1 = 0.3 
 L2 = 0.2
@@ -11,7 +13,7 @@ L12_WH = 0.05
 BASE_HEIGHT = 0.5
 J4_LIMIT_MIN = -L3 - L12_WH
 J4_LIMIT_MAX = BASE_HEIGHT + L12_WH
-ARM_PLANE_HEIGHT = BASE_HEIGHT - L3 # z = 0.05 quando d4 = 0
+ARM_PLANE_HEIGHT = BASE_HEIGHT - L3 # z = 0.05 when d4 = 0
 
 def calculate_dk(q):
     """
@@ -40,8 +42,8 @@ class PotentialFieldsPlanner(Node):
 
         
         # Defines the GOAL position in the workspace
-        self.goal_pose = np.array([0.05, 0.15])  # x, y coordinates
-        self.goal_z = 0.3 # Fixed height for the end-effector (above the table)
+        self.goal_pose = np.array([0.05, 0.34])  # x, y coordinates
+        self.goal_z = 0.15 # Fixed height for the end-effector (above the table)
 
         #Obstacle map
         # taken from the .world file
@@ -58,8 +60,10 @@ class PotentialFieldsPlanner(Node):
         self.step_size = 0.02 # robot step size 
         self.goal_threshold = 0.02 #  to consider goal reached
 
+        self.path_history = [] 
+        self.data_saved = False 
+
         self.get_logger().info(f'Potential Fields Planner Node has started. goal is at: {self.goal_pose}')
-        self.get_logger().info(f'==> Goal at: {self.goal_pose}')
         self.get_logger().info(f'==> Map obstacles: {len(self.obstacles)} ')
 
         
@@ -107,11 +111,16 @@ class PotentialFieldsPlanner(Node):
         if self.current_pose_xy is None:
             self.get_logger().warn('Waiting for curent_pose...', throttle_duration_sec=5.0)
             return
+        
+        self.path_history.append([self.current_pose_xy[0], self.current_pose_xy[1], self.goal_z]) 
 
     #Chek if goal is reached
         dist_to_goal = np.linalg.norm(self.goal_pose - self.current_pose_xy)
         if dist_to_goal < self.goal_threshold:
-            self.get_logger().info(f'Goal reached, distance to goal: {dist_to_goal:.3f}m) ***')
+            self.get_logger().info(f'Goal reached, distance to goal: {dist_to_goal:.3f}m) ')
+            if not self.data_saved: 
+                self.save_data_to_csv() 
+                self.data_saved = True 
             self.timer.cancel() 
             # Send final goal pose to ensure robot stops there
             self.publish_target_pose(self.goal_pose[0], self.goal_pose[1], self.goal_z)
@@ -169,6 +178,19 @@ class PotentialFieldsPlanner(Node):
         
         self.target_pose_pub.publish(msg)
 
+    def save_data_to_csv(self): 
+        self.get_logger().info("Saving path and obstacles to CSV...") 
+        with open('src/assets/pf_path.csv', 'w', newline='') as f: 
+            writer = csv.writer(f) 
+            writer.writerow(['x', 'y', 'z']) 
+            for pt in self.path_history: 
+                writer.writerow(pt) 
+        with open('src/assets/obstacles.csv', 'w', newline='') as f: 
+            writer = csv.writer(f) 
+            writer.writerow(['type', 'p1', 'p2', 'p3', 'p4', 'p5', 'p6']) 
+            for obs in self.obstacles: 
+                writer.writerow(['cylinder', obs['pos'][0], obs['pos'][1], 0.0, 0.5, obs['radius'], 0]) 
+        self.get_logger().info(f"Data saved to {os.getcwd()}/pf_path.csv") 
 
 def main(args=None):
     rclpy.init(args=args)

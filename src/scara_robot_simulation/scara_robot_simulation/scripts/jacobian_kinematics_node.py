@@ -137,7 +137,7 @@ class KinematicsJacobianNode(Node):
 
     def solve_ik_jacobian(self, target_pose):
         """
-        Solve ik using Levenberg-Marquardt algorithm or Damped Least Squares (DLS) method.
+        Solve ik using Levenberg-Marquardt fixed algorithm or Damped Least Squares (DLS) method.
         target_pose: [x, y, z, phi]
         Returns joint angles [theta1, theta2, theta3, d4] or None if no solution found.
         """
@@ -150,14 +150,14 @@ class KinematicsJacobianNode(Node):
         target_vector = np.array(target_pose) # [x, y, z, phi]
         
         # Parameters
-        max_iterations = 500
+        max_iterations = 800
         tolerance = 0.005 
         alpha = 0.5 
         
         # Damping factor
         # If higher, it tends to be more stable but converges slower near singularities
         # if lower, its faster but unstable near singularities (aproximates to the LMP(Least Mean Squares) problem)
-        damping_lambda = 1.2
+        damping_lambda = 0.68 #For Lavenberg-Marquardt method this lambda should be adaptative, but for DLS we can use a fixed value
 
         for i in range(max_iterations):
             current_pose_fk = self.calculate_fk(q_current)
